@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'ui/mainwindow.ui'
 #
-# Created: Sat Apr 27 16:19:38 2013
+# Created: Sat Apr 27 17:05:21 2013
 #      by: PyQt4 UI code generator 4.10
 #
 # WARNING! All changes made in this file will be lost!
@@ -59,7 +59,7 @@ class Ui_MainWindow(object):
         self.nawiazanePolaczeniaLbl = QtGui.QLabel(self.centralwidget)
         self.nawiazanePolaczeniaLbl.setObjectName(_fromUtf8("nawiazanePolaczeniaLbl"))
         self.verticalLayout.addWidget(self.nawiazanePolaczeniaLbl)
-        self.peerList = QtGui.QListView(self.centralwidget)
+        self.peerList = QtGui.QListWidget(self.centralwidget)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)

@@ -46,3 +46,7 @@ class Okienko(QtGui.QMainWindow):
             self.ui.nrTuryLbl.setText("Numer tury: %s" % Protokol.nr_tury)
         if Protokol.port_nasluchu:
             self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % Protokol.port_nasluchu)
+            
+        self.ui.peerList.clear()
+        for gniazdo in Protokol.podlaczeni:
+            self.ui.peerList.addItem("(K) %s:%s" % gniazdo.client_address)

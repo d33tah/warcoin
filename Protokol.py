@@ -2,6 +2,8 @@ import logging
 import SocketServer
 import threading
 import socket
+from PyQt4 import QtCore
+
 
 class Protokol(SocketServer.BaseRequestHandler):
     
@@ -12,6 +14,7 @@ class Protokol(SocketServer.BaseRequestHandler):
     gniazdo = None
     okno = None
     port_nasluchu = None
+    podlaczeni = []
     
     @classmethod
     def odczytuj(self):
@@ -34,6 +37,7 @@ class Protokol(SocketServer.BaseRequestHandler):
     
     def handle(self):
         Protokol.gniazdo = self.request
+        Protokol.podlaczeni += [self]
         Protokol.odczytuj()
      
     @classmethod               
