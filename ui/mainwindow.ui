@@ -78,11 +78,8 @@
          </item>
          <item>
           <widget class="QPushButton" name="przelejPunktyBtn">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
            <property name="text">
-            <string>Przelej punkty</string>
+            <string>P&amp;rzelej punkty</string>
            </property>
           </widget>
          </item>

@@ -4,6 +4,9 @@ import logging
 import SocketServer
 import threading
 import socket
+import base64
+import random
+from Crypto.Cipher import DES3
 
 class Protokol(SocketServer.BaseRequestHandler):
     
@@ -16,15 +19,18 @@ class Protokol(SocketServer.BaseRequestHandler):
     port_nasluchu = None
     podlaczeni = []
     historia_gry = ""
+    wolne_punkty = 1
+    zaszyfrowane = []
+    klucz_szyfrujacy = ''.join([ chr(random.randint(0, 255)) for i in range(16)])
     
     @classmethod
     def rozpocznij_gre(self, czy_serwer):
         if czy_serwer:
-            self.plansza[0][0] = "X"
-            self.plansza[4][4] = "!"
+            self.plansza[0][0] = "?"
+            self.plansza[4][4] = 1
         else:
-            self.plansza[0][0] = "!"
-            self.plansza[4][4] = "X"
+            self.plansza[0][0] = 1
+            self.plansza[4][4] = "?"
             
     @classmethod
     def koniec_tury(self):
@@ -32,39 +38,52 @@ class Protokol(SocketServer.BaseRequestHandler):
         logging.debug("KONIECTURY")
         self.zglosil = True
         if self.zglosilem:
-            self.nr_tury += 1
-            self.zglosilem = False
-            self.zglosil = False
+            self.obsluz_nowa_ture()
             logging.debug("Nowa tura, nr=%s" % self.nr_tury)
+    
+    @classmethod
+    def dodaj_punkt(self, x, y):
+        self.plansza[x][y] += 1
+        self.wolne_punkty -= 1
+        zero_pad = lambda tekst: tekst + '\0' * (8 - len(tekst) % 8)
+        des3 = DES3.new(self.klucz_szyfrujacy, DES3.MODE_CBC , '12345678')
+        zaszyfrowane = des3.encrypt(zero_pad("PRZELEJ %s %s" % (x, y)))
+        self.gniazdo.send("ZASZYFROWANE %s" % base64.encodestring(zaszyfrowane))
     
     @classmethod
     def przesun(self, komenda):
         s_x, s_y, x, y = map(int, komenda[1:])
         self.dopisz(u"Przeciwnik sie przesunął: %s,%s->%s,%s" % (s_x, s_y, x, y))
-        self.dopisz(u"Koniec tury.")
         self.plansza[s_x][s_y] = None
         self.plansza[x][y] = "X"
     
     @classmethod
-    def odczytuj(self, czy_serwer = True):
+    def odczytuj(self, czy_serwer=True):
         self.rozpocznij_gre(czy_serwer)
         if self.gniazdo is None:
             self.gniazdo = self.request
         logging.info("Siedze tu.")
         while True:
             data = self.gniazdo.recv(1024).rstrip()
-            #logging.debug("k_data=%s" % data)
+            # logging.debug("k_data=%s" % data)
             komenda = data.split(' ')
-            if komenda[0]=='KONIECTURY':
+            if komenda == []:
+                continue
+            if komenda[0] == 'KONIECTURY':
                 self.koniec_tury()
-            if komenda[0]=="PRZESUN":
+            elif komenda[0] == "PRZESUN":
                 self.przesun(komenda)
+            elif komenda[0] == "ZASZYFROWANE":
+                logging.error("Odebralem zaszyfrowane: %s, %s" % (komenda, komenda[1]))
+                self.zaszyfrowane += komenda[1]
+            else:
+                logging.error("Nieznana komenda:" % komenda[0])
 
     @classmethod
     def wyslij_przesun(self, stary_pos, nowy_pos):
         s_x, s_y = stary_pos 
         x, y = nowy_pos
-        self.gniazdo.send("PRZESUN %s %s %s %s" % ( s_x, s_y, x, y))
+        self.gniazdo.send("PRZESUN %s %s %s %s" % (s_x, s_y, x, y))
         self.dopisz(u"Przesunięto się: %s,%s->%s,%s" % (s_x, s_y, x, y))
     
     def handle(self):
@@ -73,6 +92,13 @@ class Protokol(SocketServer.BaseRequestHandler):
         Protokol.podlaczeni += [("K", host, port)]
         self.dopisz(u"Przyjęto połączenie od %s:%s" % (host, port))
         Protokol.odczytuj(False)
+    
+    @classmethod
+    def obsluz_nowa_ture(self):
+        self.nr_tury += 1
+        self.zglosil = False
+        self.zglosilem = False
+        self.wolne_punkty += 1
      
     @classmethod               
     def nowa_tura(self):
@@ -81,9 +107,7 @@ class Protokol(SocketServer.BaseRequestHandler):
         self.zglosilem = True
         self.gniazdo.send("KONIECTURY")
         if self.zglosil:
-            self.nr_tury += 1
-            self.zglosil = False
-            self.zglosilem = False
+            self.obsluz_nowa_ture()
             logging.debug("Nowa tura, nr=%s" % self.nr_tury)
             
     @classmethod
