@@ -52,5 +52,18 @@ class Protokol(SocketServer.BaseRequestHandler):
         Protokol.gniazdo = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         Protokol.gniazdo.connect((host, port))
         threading.Thread(target=Protokol.odczytuj).start()
-
         
+    @classmethod
+    def uruchom_serwer(self):
+        port = 4000
+        while True:
+            try:
+                logging.info("Proboje port %s" % port)
+                server = SocketServer.TCPServer(("0.0.0.0", port), Protokol)
+                Protokol.port_nasluchu = port
+                logging.info("Sukces.")
+                break
+            except socket.error:
+                port += 1
+        t = threading.Thread(target=lambda:server.serve_forever())
+        t.start()
