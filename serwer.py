@@ -1,10 +1,13 @@
 #!/usr/bin/python
 
+from __future__ import print_function
+
 import logging
 import socket
 import SocketServer
 import threading
-import time
+from PyQt4 import QtGui
+from PyQt4 import QtCore
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -22,7 +25,7 @@ class ProtokolSerwera(SocketServer.BaseRequestHandler):
         gniazdo = self.request
         while True:
             data = self.request.recv(1024).rstrip()
-            logging.debug("data=%s" % data)
+            logging.debug("s_data=%s" % data)
             komenda = data.split(' ')
             if komenda[0]=='KONIECTURY':
                 logging.debug("KONIECTURY")
@@ -33,6 +36,16 @@ class ProtokolSerwera(SocketServer.BaseRequestHandler):
                     zglosil = False
                     logging.debug("Nowa tura, nr=%s" % nr_tury)
                 
+
+def ui():
+    global gniazdo, zglosil, zglosilem, nr_tury
+    zglosilem = True
+    gniazdo.send("KONIECTURY")
+    if zglosil:
+        nr_tury += 1
+        zglosil = False
+        zglosilem = False
+        logging.debug("Nowa tura, nr=%s" % nr_tury)
 
 if __name__=="__main__":
     port = 4000
@@ -46,17 +59,13 @@ if __name__=="__main__":
             port += 1
     t = threading.Thread(target=lambda:server.serve_forever())
     t.start()
-    while gniazdo is None:
-        pass
-    while True:
-        print("Komenda: ")
-        komenda = raw_input().split(' ')
-        if komenda[0]=="KONIECTURY":
-            zglosilem = True
-            if zglosil:
-                nr_tury += 1
-                zglosil = False
-                zglosilem = False
-                logging.debug("Nowa tura, nr=%s" % nr_tury)
-
-        gniazdo.send(' '.join(komenda))
+    app = QtGui.QApplication([])
+    window = QtGui.QWidget()
+    layout = QtGui.QVBoxLayout(window)
+    window.setLayout(layout)
+    btn = QtGui.QPushButton("No kurwa")
+    btn.clicked.connect(lambda: ui())
+    layout.addWidget(btn)
+    window.show()
+    app.exec_()
+    
