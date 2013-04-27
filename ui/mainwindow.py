@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'ui/mainwindow.ui'
 #
-# Created: Sat Apr 27 20:50:46 2013
+# Created: Sat Apr 27 22:40:40 2013
 #      by: PyQt4 UI code generator 4.10
 #
 # WARNING! All changes made in this file will be lost!
@@ -75,8 +75,10 @@ class Ui_MainWindow(object):
         self.przelejPunktyBtn = QtGui.QPushButton(self.panelGry)
         self.przelejPunktyBtn.setObjectName(_fromUtf8("przelejPunktyBtn"))
         self.layoutGry.addWidget(self.przelejPunktyBtn)
+        self.zabierzPunktyBtn = QtGui.QPushButton(self.panelGry)
+        self.zabierzPunktyBtn.setObjectName(_fromUtf8("zabierzPunktyBtn"))
+        self.layoutGry.addWidget(self.zabierzPunktyBtn)
         self.kupJednostkeBtn = QtGui.QPushButton(self.panelGry)
-        self.kupJednostkeBtn.setEnabled(False)
         self.kupJednostkeBtn.setObjectName(_fromUtf8("kupJednostkeBtn"))
         self.layoutGry.addWidget(self.kupJednostkeBtn)
         self.verticalLayout_3.addLayout(self.layoutGry)
@@ -168,9 +170,10 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle(_translate("MainWindow", "Warcoin", None))
         self.nrTuryLbl.setText(_translate("MainWindow", "Numer tury: ?", None))
         self.pozostaloPunktowLbl.setText(_translate("MainWindow", "Pozostało punktów: ?", None))
-        self.nowaTuraBtn.setText(_translate("MainWindow", "Nowa tura", None))
+        self.nowaTuraBtn.setText(_translate("MainWindow", "&Nowa tura", None))
         self.przelejPunktyBtn.setText(_translate("MainWindow", "P&rzelej punkty", None))
-        self.kupJednostkeBtn.setText(_translate("MainWindow", "Kup jednostkę", None))
+        self.zabierzPunktyBtn.setText(_translate("MainWindow", "&Zabierz punkty", None))
+        self.kupJednostkeBtn.setText(_translate("MainWindow", "&Kup jednostkę", None))
         self.historiaGryLbl.setText(_translate("MainWindow", "Historia gry:", None))
         self.nawiazanePolaczeniaLbl.setText(_translate("MainWindow", "Nawiązane połączenia:", None))
         self.rozlaczBtn.setText(_translate("MainWindow", "Rozłącz", None))

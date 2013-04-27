@@ -72,7 +72,7 @@
          <item>
           <widget class="QPushButton" name="nowaTuraBtn">
            <property name="text">
-            <string>Nowa tura</string>
+            <string>&amp;Nowa tura</string>
            </property>
           </widget>
          </item>
@@ -84,12 +84,16 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="kupJednostkeBtn">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
+          <widget class="QPushButton" name="zabierzPunktyBtn">
            <property name="text">
-            <string>Kup jednostkę</string>
+            <string>&amp;Zabierz punkty</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="kupJednostkeBtn">
+           <property name="text">
+            <string>&amp;Kup jednostkę</string>
            </property>
           </widget>
          </item>

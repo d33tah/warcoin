@@ -3,6 +3,7 @@
 from PyQt4 import QtCore
 from PyQt4 import QtGui
 import socket
+import logging
 
 try:
     from PyQt4 import uic
@@ -12,6 +13,8 @@ except ImportError:
     got_uic = False
 
 from Protokol import Protokol
+from Jednostka import Jednostka
+import config as c
 
 class Okienko(QtGui.QMainWindow):
     
@@ -38,14 +41,15 @@ class Okienko(QtGui.QMainWindow):
         self.ui.podlaczSieBtn.clicked.connect(lambda: self.podlacz_sie())
         self.ui.nowaTuraBtn.clicked.connect(lambda: self.protokol.nowa_tura())
         self.ui.przelejPunktyBtn.clicked.connect(self.przelej_punkty)
+        self.ui.zabierzPunktyBtn.clicked.connect(self.zabierz_punkty)
+        self.ui.kupJednostkeBtn.clicked.connect(self.kup_jednostke)
         
         pionowo = QtGui.QVBoxLayout()
-        self.rozmiar_planszy = 5
         self.ui.widget.setLayout(pionowo)
-        self.przyciski = [ [None for _ in range(self.rozmiar_planszy)] for _ in range(self.rozmiar_planszy) ]
-        for y in range(self.rozmiar_planszy):
+        self.przyciski = [ [None for _ in range(c.wielkosc_planszy)] for _ in range(c.wielkosc_planszy) ]
+        for y in range(c.wielkosc_planszy):
             poziomo = QtGui.QHBoxLayout()
-            for x in range(self.rozmiar_planszy):
+            for x in range(c.wielkosc_planszy):
                 wdg = QtGui.QPushButton()
                 wdg.clicked.connect(lambda wdg=wdg, x=x, y=y: self.wcisnieto_przycisk(x, y))
                 poziomo.addWidget(wdg)
@@ -54,20 +58,39 @@ class Okienko(QtGui.QMainWindow):
     
     def przelej_punkty(self):
         self.tryb_przyciskow = "PRZELEJ"
+        
+    def zabierz_punkty(self):
+        self.tryb_przyciskow = "ZABIERZ"
+
+    def kup_jednostke(self):
+        if self.protokol.czy_serwer:
+            x, y = c.wielkosc_planszy-1, c.wielkosc_planszy-1
+        else:
+            x, y = 0, 0
+        if self.protokol.plansza[x][y] is not None:
+            QtGui.QMessageBox.critical(self, u'Błąd', u"Róg planszy zajęty.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
+        elif self.protokol.wolne_punkty < c.koszt_kupna:
+            QtGui.QMessageBox.critical(self, u'Błąd', u"Nie masz tyle punktów.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
+        else:
+            self.protokol.kup_jednostke()
+            
             
     def wcisnieto_przycisk(self, x, y):
         
-        oznaczenie = self.protokol.plansza[x][y]
-        if oznaczenie is not None and oznaczenie!="?":
-            nasza_jednostka = True
+        logging.critical("WAZNE: refaktorowac wcisnieto_przycisk. Wszystkie warunki powinny być sprawdzane po stronie protokołu.")
+        jednostka = self.protokol.plansza[x][y]
+        if isinstance(jednostka, Jednostka) and jednostka.czyja:
+            nasza = True
         else:
-            nasza_jednostka = False
+            nasza = False
+            
         blad = lambda err: QtGui.QMessageBox.critical(self, u'Błąd', err, QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
             
         if self.tryb_przyciskow is None:
-            oznaczenie = self.protokol.plansza[x][y]
-            if oznaczenie is not None and oznaczenie!="?":
-                if oznaczenie > 1:
+            if nasza:
+                if jednostka.wykonano_ruch:
+                    blad(u"Wykonałeś już ruch tą jednostką!")
+                elif jednostka.ile_hp > 1:
                     self.ruch_z = (x, y)
                     self.tryb_przyciskow = "PRZESUN"
                 else:
@@ -79,19 +102,30 @@ class Okienko(QtGui.QMainWindow):
             if y == stary_y and (x == stary_x + 1 or x == stary_x - 1) or \
                     x == stary_x and (y == stary_y + 1 or y == stary_y - 1):
                 self.protokol.wyslij_przesun(self.ruch_z, (x, y))
-                self.protokol.plansza[x][y] = self.protokol.plansza[stary_x][stary_y]-1
-                self.protokol.plansza[stary_x][stary_y] = None
+                stara = self.protokol.plansza[stary_x][stary_y] 
+                stara.przesun(x, y)
+                stara.wykonano_ruch = True
+                stara.zabierz_punkt()
                 self.tryb_przyciskow = None
             else:
                 blad(u"Niedozwolony ruch: %s,%s" % (x, y))
         elif self.tryb_przyciskow == "PRZELEJ":
             if self.protokol.wolne_punkty > 0:
-                if nasza_jednostka:
+                if nasza:
                     self.protokol.dodaj_punkt(x, y)
                 else:
                     blad(u"Tu nie ma twoich wojsk!")
             else:
                 blad(u"Brak wolnych punktów!")
+            self.tryb_przyciskow = None
+        elif self.tryb_przyciskow == "ZABIERZ":
+            if nasza:
+                if jednostka.ile_hp > 1:
+                    self.protokol.zabierz_punkt(x, y)
+                else:
+                    blad(u"Jednostka ma za mało punktów!")
+            else:
+                blad(u"Tu nie ma twoich wojsk!")
             self.tryb_przyciskow = None
         else:
             blad(u"Nie zaimplementowano.")
@@ -100,7 +134,7 @@ class Okienko(QtGui.QMainWindow):
     
     def podlacz_sie(self):
         try:
-            self.protokol.podlacz_sie(self.ui.adresIpEdit.text(),int(self.ui.numerPortuEdit.text()))
+            self.protokol.podlacz_sie(self.ui.adresIpEdit.text(), int(self.ui.numerPortuEdit.text()))
         except socket.error, e:
             QtGui.QMessageBox.critical(self, u'Błąd', unicode(e), QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
             self.ui.statusbar.showMessage(str(e))
@@ -111,10 +145,18 @@ class Okienko(QtGui.QMainWindow):
         cur = self.ui.historiaGryEdit.textCursor()
         cur.movePosition(QtGui.QTextCursor.End)
         self.ui.historiaGryEdit.setTextCursor(cur)
-        for x in range(self.rozmiar_planszy):
-            for y in range(self.rozmiar_planszy):
+        i = 1
+        for x in range(c.wielkosc_planszy):
+            for y in range(c.wielkosc_planszy):
                 pkt = self.protokol.plansza[x][y]
-                self.przyciski[x][y].setText('' if pkt is None else str(pkt)) 
+                if pkt is None:
+                        text = '' 
+                else:
+                    text = "%s" % (str(pkt))
+                    if pkt.czyja:
+                        i += 1
+                self.przyciski[x][y].setText(text)
+                
         
         if self.protokol.gniazdo:
             self.ui.panelGry.setEnabled(not self.protokol.zglosilem)

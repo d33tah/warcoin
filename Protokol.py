@@ -5,12 +5,15 @@ import SocketServer
 import threading
 import socket
 import base64
-import random
+
 from Crypto.Cipher import DES3
+
+from Jednostka import Jednostka
+import config as c
 
 class Protokol(SocketServer.BaseRequestHandler):
     
-    plansza = [ [None for _ in range(5)] for _ in range(5) ]
+    plansza = [ [None for _ in range(c.wielkosc_planszy)] for _ in range(c.wielkosc_planszy) ]
     nr_tury = 0
     zglosilem = False
     zglosil = False
@@ -19,18 +22,30 @@ class Protokol(SocketServer.BaseRequestHandler):
     port_nasluchu = None
     podlaczeni = []
     historia_gry = ""
-    wolne_punkty = 1
+    wolne_punkty = 4
     zaszyfrowane = []
-    klucz_szyfrujacy = ''.join([ chr(random.randint(0, 255)) for i in range(16)])
+    czy_serwer = False
+    
+    @classmethod
+    def wspolrzedne_gracza(self):
+        if self.czy_serwer:
+            return (c.wielkosc_planszy-1, c.wielkosc_planszy-1)
+        else:
+            return (0,0)
+        
+    @classmethod
+    def wspolrzedne_przeciwnika(self):
+        if not self.czy_serwer:
+            return (c.wielkosc_planszy-1, c.wielkosc_planszy-1)
+        else:
+            return (0,0)
     
     @classmethod
     def rozpocznij_gre(self, czy_serwer):
-        if czy_serwer:
-            self.plansza[0][0] = "?"
-            self.plansza[4][4] = 1
-        else:
-            self.plansza[0][0] = 1
-            self.plansza[4][4] = "?"
+        x, y = self.wspolrzedne_gracza()
+        x2, y2 = self.wspolrzedne_przeciwnika()
+        Jednostka.dopisz(self.plansza, x2, y2, False)
+        Jednostka.dopisz(self.plansza, x, y, True)
             
     @classmethod
     def koniec_tury(self):
@@ -40,25 +55,46 @@ class Protokol(SocketServer.BaseRequestHandler):
         if self.zglosilem:
             self.obsluz_nowa_ture()
             logging.debug("Nowa tura, nr=%s" % self.nr_tury)
+            
+    @classmethod
+    def kup_jednostke(self):
+        x, y = self.wspolrzedne_gracza()
+        if self.plansza[x][y] is not None:
+            raise Exception(u"Róg planszy zajęty.")
+        Jednostka.dopisz(self.plansza, x, y, True)
+        self.wolne_punkty -= c.koszt_kupna
+        self.gniazdo.send("KUPUJE")
+    
+    @classmethod
+    def nadaj_zaszyfrowana(self, komunikat, x, y):
+        zero_pad = lambda tekst: tekst + '\0' * (8 - len(tekst) % 8)
+        des3 = DES3.new(self.plansza[x][y].klucz_szyfrujacy, DES3.MODE_CBC , '12345678')
+        zaszyfrowane = des3.encrypt(zero_pad(komunikat))
+        self.gniazdo.send("ZASZYFROWANE %s" % base64.encodestring(zaszyfrowane))
     
     @classmethod
     def dodaj_punkt(self, x, y):
-        self.plansza[x][y] += 1
+        self.plansza[x][y].dodaj_punkt()
         self.wolne_punkty -= 1
-        zero_pad = lambda tekst: tekst + '\0' * (8 - len(tekst) % 8)
-        des3 = DES3.new(self.klucz_szyfrujacy, DES3.MODE_CBC , '12345678')
-        zaszyfrowane = des3.encrypt(zero_pad("PRZELEJ %s %s" % (x, y)))
-        self.gniazdo.send("ZASZYFROWANE %s" % base64.encodestring(zaszyfrowane))
+        self.nadaj_zaszyfrowana("PRZELEJ %s %s" % (x, y), x, y)
+        self.dopisz("Przelano punkty do (%s, %s)" % (x, y))
+        
+    @classmethod
+    def zabierz_punkt(self, x, y):
+        self.plansza[x][y].zabierz_punkt()
+        self.wolne_punkty += 1
+        self.nadaj_zaszyfrowana("ZABIERZ %s %s" % (x, y), x, y)
+        self.dopisz("Zabrano punkty z (%s, %s)" % (x, y))
     
     @classmethod
     def przesun(self, komenda):
         s_x, s_y, x, y = map(int, komenda[1:])
         self.dopisz(u"Przeciwnik sie przesunął: %s,%s->%s,%s" % (s_x, s_y, x, y))
-        self.plansza[s_x][s_y] = None
-        self.plansza[x][y] = "X"
+        self.plansza[s_x][s_y].przesun(x,y)
     
     @classmethod
     def odczytuj(self, czy_serwer=True):
+        self.czy_serwer = czy_serwer
         self.rozpocznij_gre(czy_serwer)
         if self.gniazdo is None:
             self.gniazdo = self.request
@@ -67,17 +103,20 @@ class Protokol(SocketServer.BaseRequestHandler):
             data = self.gniazdo.recv(1024).rstrip()
             # logging.debug("k_data=%s" % data)
             komenda = data.split(' ')
-            if komenda == []:
+            if komenda == [] or komenda == ['']:
                 continue
             if komenda[0] == 'KONIECTURY':
                 self.koniec_tury()
             elif komenda[0] == "PRZESUN":
                 self.przesun(komenda)
             elif komenda[0] == "ZASZYFROWANE":
-                logging.error("Odebralem zaszyfrowane: %s, %s" % (komenda, komenda[1]))
+                self.dopisz(u"Odebrano (zaszyfrowane)")
                 self.zaszyfrowane += komenda[1]
+            elif komenda[0] == "KUPUJE":
+                x, y = self.wspolrzedne_przeciwnika()
+                Jednostka.dopisz(self.plansza, x, y, False)
             else:
-                logging.error("Nieznana komenda:" % komenda[0])
+                logging.error("Nieznana komenda: '%s'" % komenda[0])
 
     @classmethod
     def wyslij_przesun(self, stary_pos, nowy_pos):
@@ -99,6 +138,11 @@ class Protokol(SocketServer.BaseRequestHandler):
         self.zglosil = False
         self.zglosilem = False
         self.wolne_punkty += 1
+        for x in range(c.wielkosc_planszy):
+            for y in range(c.wielkosc_planszy):
+                jednostka = self.plansza[x][y]
+                if isinstance(jednostka, Jednostka):
+                    jednostka.wykonano_ruch = False
      
     @classmethod               
     def nowa_tura(self):
