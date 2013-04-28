@@ -154,6 +154,7 @@ class Okienko(QtGui.QMainWindow):
                 else:
                     text = "%s" % (str(pkt))
                     if pkt.czyja:
+                        text += " (&%s)" % i
                         i += 1
                 self.przyciski[x][y].setText(text)
                 

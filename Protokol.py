@@ -14,7 +14,7 @@ import config as c
 class Protokol(SocketServer.BaseRequestHandler):
     
     plansza = [ [None for _ in range(c.wielkosc_planszy)] for _ in range(c.wielkosc_planszy) ]
-    nr_tury = 0
+    nr_tury = 1
     zglosilem = False
     zglosil = False
     gniazdo = None
@@ -22,9 +22,10 @@ class Protokol(SocketServer.BaseRequestHandler):
     port_nasluchu = None
     podlaczeni = []
     historia_gry = ""
-    wolne_punkty = 4
+    wolne_punkty = c.punkty_start
     zaszyfrowane = []
     czy_serwer = False
+    jednostki = []
     
     @classmethod
     def wspolrzedne_gracza(self):
@@ -44,8 +45,8 @@ class Protokol(SocketServer.BaseRequestHandler):
     def rozpocznij_gre(self, czy_serwer):
         x, y = self.wspolrzedne_gracza()
         x2, y2 = self.wspolrzedne_przeciwnika()
-        Jednostka.dopisz(self.plansza, x2, y2, False)
-        Jednostka.dopisz(self.plansza, x, y, True)
+        Jednostka.dopisz(self, x2, y2, False)
+        Jednostka.dopisz(self, x, y, True)
             
     @classmethod
     def koniec_tury(self):
@@ -61,8 +62,9 @@ class Protokol(SocketServer.BaseRequestHandler):
         x, y = self.wspolrzedne_gracza()
         if self.plansza[x][y] is not None:
             raise Exception(u"Róg planszy zajęty.")
-        Jednostka.dopisz(self.plansza, x, y, True)
+        Jednostka.dopisz(self, x, y, True)
         self.wolne_punkty -= c.koszt_kupna
+        self.dopisz(u"Kupiono jednostkę.")
         self.gniazdo.send("KUPUJE")
     
     @classmethod
@@ -114,9 +116,17 @@ class Protokol(SocketServer.BaseRequestHandler):
                 self.zaszyfrowane += komenda[1]
             elif komenda[0] == "KUPUJE":
                 x, y = self.wspolrzedne_przeciwnika()
-                Jednostka.dopisz(self.plansza, x, y, False)
+                Jednostka.dopisz(self, x, y, False)
+                self.dopisz(u"Przeciwnik kupił jednostkę.")
+            elif komenda[0] == "ODSZYFRUJE":
+                self.dopisz(u"Wojna. Odebrano szyfr.")
+                self.obsluz_wojne(komenda[1])
             else:
                 logging.error("Nieznana komenda: '%s'" % komenda[0])
+                
+    @classmethod
+    def obsluz_wojne(self, szyfr):
+        self.dopisz(u"Niestety, na razie not implemented.")
 
     @classmethod
     def wyslij_przesun(self, stary_pos, nowy_pos):
@@ -137,12 +147,18 @@ class Protokol(SocketServer.BaseRequestHandler):
         self.nr_tury += 1
         self.zglosil = False
         self.zglosilem = False
-        self.wolne_punkty += 1
-        for x in range(c.wielkosc_planszy):
-            for y in range(c.wielkosc_planszy):
-                jednostka = self.plansza[x][y]
-                if isinstance(jednostka, Jednostka):
-                    jednostka.wykonano_ruch = False
+        self.wolne_punkty += c.bonus_tury
+        for jednostka in self.jednostki:
+            if not jednostka.obok_przeciwnik():
+                jednostka.wykonano_ruch = False
+            else:
+                #mamy wojne
+                self.odszyfruj(jednostka)
+    
+    @classmethod
+    def odszyfruj(self, jednostka):
+        self.gniazdo.send("ODSZYFRUJE %s" % base64.encodestring(jednostka.klucz_szyfrujacy))
+            
      
     @classmethod               
     def nowa_tura(self):
