@@ -6,25 +6,35 @@ import base64
 from Crypto.Cipher import DES3
 
 from Jednostka import Jednostka
-from Protokol import Protokol
 import config as c
 from Gracz import Gracz
 from Rozkaz import Rozkaz, TypyRozkazow
 
 class Gra:
     
-    plansza = [ [None for _ in range(c.wielkosc_planszy)] for _ in range(c.wielkosc_planszy) ]
-    nr_tury = 1
-    historia_gry = ""
-    wolne_punkty = c.punkty_start
-    jednostki = []
-    protokol = Protokol
-    rozkazy = []
-    
-    gracz = None
-    przeciwnik = None
-    
+    polsingleton = None
+
     @classmethod
+    def instance(cls):
+        if cls.polsingleton is None:
+            cls.polsingleton = cls()
+        return cls.polsingleton
+
+    
+    def __init__(self):
+        self.plansza = [ [None for _ in range(c.wielkosc_planszy)] 
+                        for _ in range(c.wielkosc_planszy) ]
+        self.nr_tury = 1
+        self.historia_gry = ""
+        self.wolne_punkty = c.punkty_start
+        self.jednostki = []
+        self.rozkazy = []
+        
+        self.polaczenie = None
+        
+        self.gracz = None
+        self.przeciwnik = None
+    
     def rozpocznij_gre(self, czy_serwer, wspolrzedne_gracza, wspolrzedne_przeciwnika):
         self.gracz = Gracz(wspolrzedne_gracza)
         self.przeciwnik = Gracz(wspolrzedne_przeciwnika)
@@ -33,25 +43,21 @@ class Gra:
         Jednostka.dopisz(self, x2, y2, False)
         Jednostka.dopisz(self, x, y, True)
     
-    @classmethod
     def przesun_nasza(self, s_x, s_y, x, y):
         args = (s_x, s_y, x, y)
         self.rozkazy += [Rozkaz(self.gracz, TypyRozkazow.PRZESUN, args)]
         self.dopisz(u"Przesunięto się: %s,%s->%s,%s" % args)
-        self.protokol.wyslij_przesun(*args)
+        self.polaczenie.wyslij_przesun(*args)
     
-    @classmethod
     def przesun_wroga(self, s_x, s_y, x, y):
         args = (s_x, s_y, x, y)
         self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.PRZESUN, args)]
         self.dopisz(u"Przeciwnik sie przesunął: %s,%s->%s,%s" % args)
         self.plansza[s_x][s_y].przesun(x,y)
         
-    @classmethod
     def dopisz(self, tekst):
         self.historia_gry += "%s\n" % tekst
             
-    @classmethod
     def kup_jednostke(self):
         self.rozkazy += [Rozkaz(self.gracz, TypyRozkazow.KUP, [])]
         x, y = self.gracz.wspolrzedne
@@ -59,25 +65,22 @@ class Gra:
             raise Exception(u"Róg planszy zajęty.")
         Jednostka.dopisz(self, x, y, True)
         self.wolne_punkty -= c.koszt_kupna
-        self.protokol.wyslij_kup()
+        self.polaczenie.wyslij_kup()
     
-    @classmethod
     def dodaj_punkt(self, x, y):
         self.rozkazy += [Rozkaz(self.gracz, TypyRozkazow.DODAJ_PUNKT, [x, y])]
         self.plansza[x][y].dodaj_punkt()
         self.wolne_punkty -= 1
-        self.protokol.wyslij_dodaj(x, y)
+        self.polaczenie.wyslij_dodaj(x, y)
         self.dopisz("Przelano punkty do (%s, %s)" % (x, y))
          
-    @classmethod
     def zabierz_punkt(self, x, y):
         self.rozkazy += [Rozkaz(self.gracz, TypyRozkazow.ZABIERZ_PUNKT, [x, y])]
         self.plansza[x][y].zabierz_punkt()
         self.wolne_punkty += 1
         self.dopisz("Zabrano punkty z (%s, %s)" % (x, y))
-        self.protokol.wyslij_zabierz(x, y)
+        self.polaczenie.wyslij_zabierz(x, y)
     
-    @classmethod
     def przyjmij_wojne(self, szyfr_base64):
         self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ODSZYFRUJ, [szyfr_base64])]
         self.dopisz(u"Niestety, na razie not implemented.")
@@ -97,7 +100,6 @@ class Gra:
                 logging.debug(self.rozkazy[i])
         logging.debug(self.rozkazy)
 
-    @classmethod
     def obsluz_nowa_ture(self):
         self.nr_tury += 1
         self.przeciwnik.zglosil_ture = False
@@ -108,9 +110,8 @@ class Gra:
                 jednostka.wykonano_ruch = False
             else:
                 #mamy wojne
-                self.protokol.odkryj_szyfr(jednostka)
+                self.polaczenie.odkryj_szyfr(jednostka)
     
-    @classmethod
     def przyjmij_nowa_ture(self):
         self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.NOWA_TURA, [])]
         self.dopisz(u"Przyjęto koniec tury.")
@@ -120,30 +121,23 @@ class Gra:
             self.obsluz_nowa_ture()
             logging.debug("Nowa tura, nr=%s" % self.nr_tury)
          
-    @classmethod               
     def nowa_tura(self):
         self.rozkazy += [Rozkaz(self.gracz, TypyRozkazow.NOWA_TURA, [])]
         self.dopisz(u"Ogłoszono koniec tury.")
         logging.debug("Wysylam")
         self.gracz.zglosil_ture = True
-        self.protokol.wyslij_nowa_ture()
+        self.polaczenie.wyslij_nowa_ture()
         if self.przeciwnik.zglosil_ture:
             self.obsluz_nowa_ture()
             logging.debug("Nowa tura, nr=%s" % self.nr_tury)
 
-    @classmethod               
     def przyjmij_zaszyfrowane(self, szyfr):
         self.dopisz(u"Odebrano (zaszyfrowane)")
         self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ZASZYFROWANE, [szyfr])]
 
-    @classmethod               
     def przyjmij_kupno(self):
         x, y = self.przeciwnik.wspolrzedne
         self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.KUP, [])]
         Jednostka.dopisz(self, x, y, False)
         self.dopisz(u"Przeciwnik kupił jednostkę.")
-
-
-logging.critical("Paskudny hack na koncu gra.py!")
-Protokol.gra = Gra
-            
+                

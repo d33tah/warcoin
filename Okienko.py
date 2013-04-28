@@ -14,14 +14,23 @@ except ImportError:
 
 from Gra import Gra
 from Jednostka import Jednostka
+from Polaczenie import Polaczenie
 import config as c
 
 class Okienko(QtGui.QMainWindow):
     
+    polsingleton = None
+    
+    @classmethod
+    def instance(cls):
+        if cls.polsingleton is None:
+            cls.polsingleton = cls()
+        return cls.polsingleton
+    
     def __init__(self):
         
         QtGui.QMainWindow.__init__(self)
-        self.gra = Gra
+        self.gra = Gra.instance()
         
         global got_uic
         if got_uic:
@@ -55,7 +64,7 @@ class Okienko(QtGui.QMainWindow):
                 poziomo.addWidget(wdg)
                 self.przyciski[x][y] = wdg
             pionowo.addLayout(poziomo)
-    
+            
     def przelej_punkty(self):
         self.tryb_przyciskow = "PRZELEJ"
         
@@ -131,7 +140,7 @@ class Okienko(QtGui.QMainWindow):
     
     def podlacz_sie(self):
         try:
-            self.gra.protokol.podlacz_sie(self.ui.adresIpEdit.text(), int(self.ui.numerPortuEdit.text()))
+            Polaczenie.podlacz_sie(self.ui.adresIpEdit.text(), int(self.ui.numerPortuEdit.text()))
         except socket.error, e:
             QtGui.QMessageBox.critical(self, u'Błąd', unicode(e), QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
             self.ui.statusbar.showMessage(str(e))
@@ -155,16 +164,15 @@ class Okienko(QtGui.QMainWindow):
                         i += 1
                 self.przyciski[x][y].setText(text)
                 
-        
-        if self.gra.protokol.gniazdo:
+        if Polaczenie.port_nasluchu:
+            self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % Polaczenie.port_nasluchu)
+                
+        if self.gra.polaczenie is not None:
             self.ui.panelGry.setEnabled(not self.gra.gracz.zglosil_ture)
             self.ui.przelejPunktyBtn.setEnabled(self.gra.wolne_punkty > 0)
             self.ui.nrTuryLbl.setText(u"Numer tury: %s" % self.gra.nr_tury)
             self.ui.pozostaloPunktowLbl.setText(u"Pozostało punktów: %s" % self.gra.wolne_punkty)
-        if self.gra.protokol.port_nasluchu:
-            self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % self.gra.protokol.port_nasluchu)
-            
-        self.ui.peerList.clear()
-        for gniazdo in self.gra.protokol.podlaczeni:
-            self.ui.peerList.addItem("(%s) %s:%s" % gniazdo)
+            self.ui.peerList.clear()
+            for gniazdo in self.gra.polaczenie.podlaczeni:
+                self.ui.peerList.addItem("(%s) %s:%s" % gniazdo)
             
