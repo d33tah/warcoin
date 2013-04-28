@@ -20,6 +20,7 @@ class Polaczenie(SocketServer.BaseRequestHandler):
 
     def handle(self):
         host, port = self.client_address
+        #jest None, jeśli odpaliliśmy ręcznie konstruktor z server=None:
         if self.server:
             typ = "S"
             self.gra.dopisz(u"Przyjęto połączenie od %s:%s" % (host, port))
@@ -27,15 +28,27 @@ class Polaczenie(SocketServer.BaseRequestHandler):
             typ = "K"
             self.gra.dopisz(u"Podłączono do %s:%s" % (host, port))
         self.podlaczeni += [(typ, host, port)]
-        
         self.odczytuj()
     
     def setup(self):
-        logging.critical("HACK: PolaczenieTymczasowy.setup()")
+        """
+        Gra potrzebuje referencji na połączenie, żeby móc wysłać wiadomości,
+        połączenie potrzebuje referencji na grę aby wykonać callbacki.
+        """
+        logging.warn("HACK: PolaczenieTymczasowy.setup()")
         self.gra = Gra.instance()
         self.gra.polaczenie = self
     
+    #Sprawdzam, czy to się kiedykolwiek wywoła.    
+    def finish(self):
+        logging.critical("Finish")
+        
+    def close(self):
+        logging.critical("Close")    
 
+    def shutdown(self):
+        logging.critical("Shutdown")
+    
     @classmethod
     def uruchom_serwer(self):
                     
@@ -58,15 +71,14 @@ class Polaczenie(SocketServer.BaseRequestHandler):
     @classmethod
     def podlacz_sie(cls, host, port):
 
-        logging.critical("HACK: PolaczenieTymczasowy")
         gniazdo = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         gniazdo.connect((host, port))
-        cls.podlaczeni += [("S", host, port)]
+        """
+        Uruchom nowy wątek, w którym tworzy się Polaczenie.
+        """
         threading.Thread(target=lambda: Polaczenie(request=gniazdo,
                                                    client_address=(host, port),
                                                    server=None)).start()
-    
-
 
     def odczytuj(self):
         
@@ -81,6 +93,11 @@ class Polaczenie(SocketServer.BaseRequestHandler):
         
         logging.info("Polaczenie.odczytuj")
         while True:
+            """
+            tutaj IMHO nie powinno być wywołania blokującego - zamiast tego
+            lepiej byłoby utworzyć kolejkę rzeczy do zapisania - wysyłałoby
+            się je np. na koniec tury, w ramach tego samego wątka
+            """
             data = self.request.recv(1024).rstrip()
             # logging.debug("k_data=%s" % data)
             komenda = data.split(' ')

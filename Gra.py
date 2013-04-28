@@ -80,28 +80,35 @@ class Gra:
         self.wolne_punkty += 1
         self.dopisz("Zabrano punkty z (%s, %s)" % (x, y))
         self.polaczenie.wyslij_zabierz(x, y)
-    
-    def przyjmij_wojne(self, szyfr_base64):
-        self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ODSZYFRUJ, 
-                                [szyfr_base64])]
-        self.dopisz(u"Niestety, na razie not implemented.")
+        
+    def odszyfruj_wiadomosci(self, szyfr_base64):
+
         szyfr = base64.decodestring(szyfr_base64)
         des3 = DES3.new(szyfr, DES3.MODE_ECB, '12345678')
+
         for i in range(len(self.rozkazy)):
+            
             if self.rozkazy[i].typ == TypyRozkazow.ZASZYFROWANE:
+                
                 zaszyfrowane = base64.decodestring(self.rozkazy[i].argumenty[0])
                 odszyfrowane = des3.decrypt(zaszyfrowane).rstrip('\0')
-                logging.debug(odszyfrowane)
+                
                 if odszyfrowane.startswith('PRZELEJ'):
                     self.rozkazy[i].typ = TypyRozkazow.DODAJ_PUNKT
                 elif odszyfrowane.startswith('ZABIERZ'):
                     self.rozkazy[i].typ = TypyRozkazow.ZABIERZ_PUNKT
                 else:
                     continue
+                
                 self.rozkazy[i].argumenty = odszyfrowane.split(' ')[1:]
-                logging.debug(self.rozkazy[i])
-        logging.debug(self.rozkazy)
-
+    
+    def przyjmij_wojne(self, szyfr_base64):
+        
+        self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ODSZYFRUJ, 
+                                [szyfr_base64])]
+        self.dopisz(u"Niestety, na razie not implemented.")
+        self.odszyfruj_wiadomosci(szyfr_base64)
+        
     def obsluz_nowa_ture(self):
         self.nr_tury += 1
         self.przeciwnik.zglosil_ture = False

@@ -39,6 +39,10 @@ class Jednostka:
         
     def obok_przeciwnik(self):
         x, y = self.x, self.y
+        """"
+        Możliwe pozycje to wszystkie pola dokoła aktualnego (bez niego), które
+        nie wychodzą poza granicę planszy.
+        """
         mozliwe_pozycje = [ (xx, yy) 
                            for xx in [x-1, x, x+1] 
                            for yy in [y-1, y, y+1] 
