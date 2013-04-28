@@ -12,7 +12,7 @@ except ImportError:
     from ui import mainwindow
     got_uic = False
 
-from Protokol import Protokol
+from Gra import Gra
 from Jednostka import Jednostka
 import config as c
 
@@ -21,7 +21,7 @@ class Okienko(QtGui.QMainWindow):
     def __init__(self):
         
         QtGui.QMainWindow.__init__(self)
-        self.protokol = Protokol
+        self.gra = Gra
         
         global got_uic
         if got_uic:
@@ -39,7 +39,7 @@ class Okienko(QtGui.QMainWindow):
         self.ruch_z = None
         
         self.ui.podlaczSieBtn.clicked.connect(lambda: self.podlacz_sie())
-        self.ui.nowaTuraBtn.clicked.connect(lambda: self.protokol.nowa_tura())
+        self.ui.nowaTuraBtn.clicked.connect(lambda: self.gra.nowa_tura())
         self.ui.przelejPunktyBtn.clicked.connect(self.przelej_punkty)
         self.ui.zabierzPunktyBtn.clicked.connect(self.zabierz_punkty)
         self.ui.kupJednostkeBtn.clicked.connect(self.kup_jednostke)
@@ -63,22 +63,22 @@ class Okienko(QtGui.QMainWindow):
         self.tryb_przyciskow = "ZABIERZ"
 
     def kup_jednostke(self):
-        if self.protokol.czy_serwer:
+        if self.gra.czy_serwer:
             x, y = c.wielkosc_planszy-1, c.wielkosc_planszy-1
         else:
             x, y = 0, 0
-        if self.protokol.plansza[x][y] is not None:
+        if self.gra.plansza[x][y] is not None:
             QtGui.QMessageBox.critical(self, u'Błąd', u"Róg planszy zajęty.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
-        elif self.protokol.wolne_punkty < c.koszt_kupna:
+        elif self.gra.wolne_punkty < c.koszt_kupna:
             QtGui.QMessageBox.critical(self, u'Błąd', u"Nie masz tyle punktów.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
         else:
-            self.protokol.kup_jednostke()
+            self.gra.kup_jednostke()
             
             
     def wcisnieto_przycisk(self, x, y):
         
         logging.critical("WAZNE: refaktorowac wcisnieto_przycisk. Wszystkie warunki powinny być sprawdzane po stronie protokołu.")
-        jednostka = self.protokol.plansza[x][y]
+        jednostka = self.gra.plansza[x][y]
         if isinstance(jednostka, Jednostka) and jednostka.czyja:
             nasza = True
         else:
@@ -101,8 +101,8 @@ class Okienko(QtGui.QMainWindow):
             stary_x, stary_y = self.ruch_z
             if y == stary_y and (x == stary_x + 1 or x == stary_x - 1) or \
                     x == stary_x and (y == stary_y + 1 or y == stary_y - 1):
-                self.protokol.wyslij_przesun(self.ruch_z, (x, y))
-                stara = self.protokol.plansza[stary_x][stary_y] 
+                self.gra.przesun_nasza(stary_x, stary_x, x, y)
+                stara = self.gra.plansza[stary_x][stary_y] 
                 stara.przesun(x, y)
                 stara.wykonano_ruch = True
                 stara.zabierz_punkt()
@@ -110,9 +110,9 @@ class Okienko(QtGui.QMainWindow):
             else:
                 blad(u"Niedozwolony ruch: %s,%s" % (x, y))
         elif self.tryb_przyciskow == "PRZELEJ":
-            if self.protokol.wolne_punkty > 0:
+            if self.gra.wolne_punkty > 0:
                 if nasza:
-                    self.protokol.dodaj_punkt(x, y)
+                    self.gra.dodaj_punkt(x, y)
                 else:
                     blad(u"Tu nie ma twoich wojsk!")
             else:
@@ -121,7 +121,7 @@ class Okienko(QtGui.QMainWindow):
         elif self.tryb_przyciskow == "ZABIERZ":
             if nasza:
                 if jednostka.ile_hp > 1:
-                    self.protokol.zabierz_punkt(x, y)
+                    self.gra.zabierz_punkt(x, y)
                 else:
                     blad(u"Jednostka ma za mało punktów!")
             else:
@@ -134,21 +134,21 @@ class Okienko(QtGui.QMainWindow):
     
     def podlacz_sie(self):
         try:
-            self.protokol.podlacz_sie(self.ui.adresIpEdit.text(), int(self.ui.numerPortuEdit.text()))
+            self.gra.protokol.podlacz_sie(self.ui.adresIpEdit.text(), int(self.ui.numerPortuEdit.text()))
         except socket.error, e:
             QtGui.QMessageBox.critical(self, u'Błąd', unicode(e), QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
             self.ui.statusbar.showMessage(str(e))
     
     def odswiez_ekran(self):
         
-        self.ui.historiaGryEdit.setText(self.protokol.historia_gry)
+        self.ui.historiaGryEdit.setText(self.gra.historia_gry)
         cur = self.ui.historiaGryEdit.textCursor()
         cur.movePosition(QtGui.QTextCursor.End)
         self.ui.historiaGryEdit.setTextCursor(cur)
         i = 1
         for x in range(c.wielkosc_planszy):
             for y in range(c.wielkosc_planszy):
-                pkt = self.protokol.plansza[x][y]
+                pkt = self.gra.plansza[x][y]
                 if pkt is None:
                         text = '' 
                 else:
@@ -159,15 +159,15 @@ class Okienko(QtGui.QMainWindow):
                 self.przyciski[x][y].setText(text)
                 
         
-        if self.protokol.gniazdo:
-            self.ui.panelGry.setEnabled(not self.protokol.zglosilem)
-            self.ui.przelejPunktyBtn.setEnabled(self.protokol.wolne_punkty > 0)
-            self.ui.nrTuryLbl.setText(u"Numer tury: %s" % self.protokol.nr_tury)
-            self.ui.pozostaloPunktowLbl.setText(u"Pozostało punktów: %s" % self.protokol.wolne_punkty)
-        if self.protokol.port_nasluchu:
-            self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % self.protokol.port_nasluchu)
+        if self.gra.protokol.gniazdo:
+            self.ui.panelGry.setEnabled(not self.gra.gracz.zglosil_ture)
+            self.ui.przelejPunktyBtn.setEnabled(self.gra.wolne_punkty > 0)
+            self.ui.nrTuryLbl.setText(u"Numer tury: %s" % self.gra.nr_tury)
+            self.ui.pozostaloPunktowLbl.setText(u"Pozostało punktów: %s" % self.gra.wolne_punkty)
+        if self.gra.protokol.port_nasluchu:
+            self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % self.gra.protokol.port_nasluchu)
             
         self.ui.peerList.clear()
-        for gniazdo in self.protokol.podlaczeni:
+        for gniazdo in self.gra.protokol.podlaczeni:
             self.ui.peerList.addItem("(%s) %s:%s" % gniazdo)
             
