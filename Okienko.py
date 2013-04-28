@@ -63,10 +63,7 @@ class Okienko(QtGui.QMainWindow):
         self.tryb_przyciskow = "ZABIERZ"
 
     def kup_jednostke(self):
-        if self.gra.czy_serwer:
-            x, y = c.wielkosc_planszy-1, c.wielkosc_planszy-1
-        else:
-            x, y = 0, 0
+        x, y = self.gra.gracz.wspolrzedne
         if self.gra.plansza[x][y] is not None:
             QtGui.QMessageBox.critical(self, u'Błąd', u"Róg planszy zajęty.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
         elif self.gra.wolne_punkty < c.koszt_kupna:

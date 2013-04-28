@@ -16,7 +16,6 @@ class Protokol(SocketServer.BaseRequestHandler):
     gniazdo = None
     port_nasluchu = None
     podlaczeni = []
-    zaszyfrowane = []
     jednostki = []
     gra = None
        
@@ -79,12 +78,9 @@ class Protokol(SocketServer.BaseRequestHandler):
             elif komenda[0] == "PRZESUN":
                 self.gra.przesun_wroga(*map(int, komenda[1:]))
             elif komenda[0] == "ZASZYFROWANE":
-                self.gra.dopisz(u"Odebrano (zaszyfrowane)")
-                self.zaszyfrowane += komenda[1]
+                self.gra.przyjmij_zaszyfrowane(komenda[1])
             elif komenda[0] == "KUPUJE":
-                x, y = self.wspolrzedne_przeciwnika()
-                Jednostka.dopisz(self, x, y, False)
-                self.gra.dopisz(u"Przeciwnik kupił jednostkę.")
+                self.gra.przyjmij_kupno()
             elif komenda[0] == "ODSZYFRUJE":
                 self.gra.przyjmij_wojne(komenda[1])
             else:
@@ -93,7 +89,7 @@ class Protokol(SocketServer.BaseRequestHandler):
     @classmethod
     def nadaj_zaszyfrowana(self, komunikat, x, y):
         zero_pad = lambda tekst: tekst + '\0' * (8 - len(tekst) % 8)
-        des3 = DES3.new(self.gra.plansza[x][y].klucz_szyfrujacy, DES3.MODE_CBC , '12345678')
+        des3 = DES3.new(self.gra.plansza[x][y].klucz_szyfrujacy, DES3.MODE_ECB , '12345678')
         zaszyfrowane = des3.encrypt(zero_pad(komunikat))
         self.gniazdo.send("ZASZYFROWANE %s" % base64.encodestring(zaszyfrowane))
                 
