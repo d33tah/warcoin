@@ -20,11 +20,21 @@ class Polaczenie(SocketServer.BaseRequestHandler):
 
     def handle(self):
         host, port = self.client_address
-        self.podlaczeni += [("K", host, port)]
-        self.gra.dopisz(u"Przyjęto połączenie od %s:%s" % (host, port))
-        logging.critical("HACK: Polaczenie.odczytuj(False), uważać przy zmianie.")
-        self.odczytuj(False)
+        if self.server:
+            typ = "S"
+            self.gra.dopisz(u"Przyjęto połączenie od %s:%s" % (host, port))
+        else:
+            typ = "K"
+            self.gra.dopisz(u"Podłączono do %s:%s" % (host, port))
+        self.podlaczeni += [(typ, host, port)]
         
+        self.odczytuj()
+    
+    def setup(self):
+        logging.critical("HACK: PolaczenieTymczasowy.setup()")
+        self.gra = Gra.instance()
+        self.gra.polaczenie = self
+    
 
     @classmethod
     def uruchom_serwer(self):
@@ -34,15 +44,8 @@ class Polaczenie(SocketServer.BaseRequestHandler):
             try:
                 logging.info("Proboje port %s" % port)
                 
-                class PolaczenieTymczasowy(Polaczenie):
-                    
-                    def setup(self):
-                        logging.critical("HACK: PolaczenieTymczasowy.setup()")
-                        self.gra = Gra.instance()
-                        self.gra.polaczenie = self
-                        
-                
-                server = SocketServer.TCPServer(("0.0.0.0", port), PolaczenieTymczasowy)
+                # ta linijka rzuci socket error, jeśli port jest już zajęty.
+                server = SocketServer.TCPServer(("0.0.0.0", port), Polaczenie)
                 Polaczenie.port_nasluchu = port
                                 
                 logging.info("Sukces.")
@@ -55,41 +58,28 @@ class Polaczenie(SocketServer.BaseRequestHandler):
     @classmethod
     def podlacz_sie(cls, host, port):
 
-        class PolaczenieTymczasowy(Polaczenie):
-            port_nasluchu = port
-
-            def setup(self):
-                logging.critical("HACK: PolaczenieTymczasowy.setup()")
-                self.gra = Gra.instance()
-                self.gra.polaczenie = self
-            
-            def handle(self):
-                self.odczytuj()
-
+        logging.critical("HACK: PolaczenieTymczasowy")
         gniazdo = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         gniazdo.connect((host, port))
         cls.podlaczeni += [("S", host, port)]
-        Gra.instance().dopisz(u"Podłączono do %s:%s" % (host, port))
-        threading.Thread(target=lambda: PolaczenieTymczasowy(request=gniazdo, client_address=None, server=None)).start()
+        threading.Thread(target=lambda: Polaczenie(request=gniazdo,
+                                                   client_address=(host, port),
+                                                   server=None)).start()
     
 
 
-    def odczytuj(self, czy_serwer=True):
-        self.czy_serwer = czy_serwer
+    def odczytuj(self):
         
-        if czy_serwer:
-            wspolrzedne_gracza = (c.wielkosc_planszy-1, c.wielkosc_planszy-1) 
+        if self.server:
+            wspolrzedne_gracza = (c.wielkosc_planszy - 1, c.wielkosc_planszy - 1) 
             wspolrzedne_wroga = (0, 0)
         else:
-            wspolrzedne_wroga = (c.wielkosc_planszy-1, c.wielkosc_planszy-1) 
+            wspolrzedne_wroga = (c.wielkosc_planszy - 1, c.wielkosc_planszy - 1) 
             wspolrzedne_gracza = (0, 0)
             
-        self.gra.rozpocznij_gre(czy_serwer, wspolrzedne_gracza, wspolrzedne_wroga)
+        self.gra.rozpocznij_gre(wspolrzedne_gracza, wspolrzedne_wroga)
         
-        #if self.request is None:
-        #    self.request = self.request
-        
-        logging.info("Siedze tu.")
+        logging.info("Polaczenie.odczytuj")
         while True:
             data = self.request.recv(1024).rstrip()
             # logging.debug("k_data=%s" % data)
@@ -111,7 +101,8 @@ class Polaczenie(SocketServer.BaseRequestHandler):
     
     def nadaj_zaszyfrowana(self, komunikat, x, y):
         zero_pad = lambda tekst: tekst + '\0' * (8 - len(tekst) % 8)
-        des3 = DES3.new(self.gra.plansza[x][y].klucz_szyfrujacy, DES3.MODE_ECB , '12345678')
+        des3 = DES3.new(self.gra.plansza[x][y].klucz_szyfrujacy, DES3.MODE_ECB,
+                         '12345678')
         zaszyfrowane = des3.encrypt(zero_pad(komunikat))
         self.request.send("ZASZYFROWANE %s" % base64.encodestring(zaszyfrowane))
                 
@@ -120,7 +111,8 @@ class Polaczenie(SocketServer.BaseRequestHandler):
         self.request.send("PRZESUN %s %s %s %s" % (s_x, s_y, x, y))
     
     def odkryj_szyfr(self, jednostka):
-        self.request.send("ODSZYFRUJE %s" % base64.encodestring(jednostka.klucz_szyfrujacy))
+        zakodowany_klucz = base64.encodestring(jednostka.klucz_szyfrujacy)
+        self.request.send("ODSZYFRUJE %s" % zakodowany_klucz)
 
     def wyslij_dodaj(self, x, y):
         self.nadaj_zaszyfrowana("PRZELEJ %s %s" % (x, y), x, y)

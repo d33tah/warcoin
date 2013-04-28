@@ -35,7 +35,7 @@ class Gra:
         self.gracz = None
         self.przeciwnik = None
     
-    def rozpocznij_gre(self, czy_serwer, wspolrzedne_gracza, wspolrzedne_przeciwnika):
+    def rozpocznij_gre(self, wspolrzedne_gracza, wspolrzedne_przeciwnika):
         self.gracz = Gracz(wspolrzedne_gracza)
         self.przeciwnik = Gracz(wspolrzedne_przeciwnika)
         x, y = wspolrzedne_gracza
@@ -82,13 +82,15 @@ class Gra:
         self.polaczenie.wyslij_zabierz(x, y)
     
     def przyjmij_wojne(self, szyfr_base64):
-        self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ODSZYFRUJ, [szyfr_base64])]
+        self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ODSZYFRUJ, 
+                                [szyfr_base64])]
         self.dopisz(u"Niestety, na razie not implemented.")
         szyfr = base64.decodestring(szyfr_base64)
         des3 = DES3.new(szyfr, DES3.MODE_ECB, '12345678')
         for i in range(len(self.rozkazy)):
             if self.rozkazy[i].typ == TypyRozkazow.ZASZYFROWANE:
-                odszyfrowane = des3.decrypt(base64.decodestring(self.rozkazy[i].argumenty[0])).rstrip('\0')
+                zaszyfrowane = base64.decodestring(self.rozkazy[i].argumenty[0])
+                odszyfrowane = des3.decrypt(zaszyfrowane).rstrip('\0')
                 logging.debug(odszyfrowane)
                 if odszyfrowane.startswith('PRZELEJ'):
                     self.rozkazy[i].typ = TypyRozkazow.DODAJ_PUNKT
@@ -133,7 +135,8 @@ class Gra:
 
     def przyjmij_zaszyfrowane(self, szyfr):
         self.dopisz(u"Odebrano (zaszyfrowane)")
-        self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ZASZYFROWANE, [szyfr])]
+        self.rozkazy += [Rozkaz(self.przeciwnik, TypyRozkazow.ZASZYFROWANE, 
+                                [szyfr])]
 
     def przyjmij_kupno(self):
         x, y = self.przeciwnik.wspolrzedne

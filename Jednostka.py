@@ -9,7 +9,8 @@ class Jednostka:
         self.gra = gra
         self.plansza = gra.plansza
         self.x, self.y = x, y
-        self.klucz_szyfrujacy = ''.join([ chr(random.randint(0, 255)) for _ in range(16)])
+        self.klucz_szyfrujacy = ''.join([ chr(random.randint(0, 255)) 
+                                         for _ in range(16)])
         self.wykonano_ruch = False
     
     @classmethod

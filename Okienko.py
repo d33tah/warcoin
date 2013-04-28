@@ -20,6 +20,9 @@ import config as c
 class Okienko(QtGui.QMainWindow):
     
     polsingleton = None
+    blad = lambda err: QtGui.QMessageBox.critical(self, u'Błąd', err, 
+                                                  QtGui.QMessageBox.Ok, 
+                                                  QtGui.QMessageBox.Ok)
     
     @classmethod
     def instance(cls):
@@ -74,9 +77,9 @@ class Okienko(QtGui.QMainWindow):
     def kup_jednostke(self):
         x, y = self.gra.gracz.wspolrzedne
         if self.gra.plansza[x][y] is not None:
-            QtGui.QMessageBox.critical(self, u'Błąd', u"Róg planszy zajęty.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
+            self.blad(u'Błąd', u"Róg planszy zajęty.")
         elif self.gra.wolne_punkty < c.koszt_kupna:
-            QtGui.QMessageBox.critical(self, u'Błąd', u"Nie masz tyle punktów.", QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
+            self.blad(u"Nie masz tyle punktów.")
         else:
             self.gra.kup_jednostke()
             
@@ -90,19 +93,18 @@ class Okienko(QtGui.QMainWindow):
         else:
             nasza = False
             
-        blad = lambda err: QtGui.QMessageBox.critical(self, u'Błąd', err, QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
             
         if self.tryb_przyciskow is None:
             if nasza:
                 if jednostka.wykonano_ruch:
-                    blad(u"Wykonałeś już ruch tą jednostką!")
+                    self.blad(u"Wykonałeś już ruch tą jednostką!")
                 elif jednostka.ile_hp > 1:
                     self.ruch_z = (x, y)
                     self.tryb_przyciskow = "PRZESUN"
                 else:
-                    blad(u"Wojska tutaj nie mają wystarczająco punktów!")
+                    self.blad(u"Wojska tutaj nie mają wystarczająco punktów!")
             else:
-                blad(u"Tu nie ma twoich wojsk!")
+                self.blad(u"Tu nie ma twoich wojsk!")
         elif self.tryb_przyciskow == "PRZESUN":
             stary_x, stary_y = self.ruch_z
             if y == stary_y and (x == stary_x + 1 or x == stary_x - 1) or \
@@ -114,35 +116,34 @@ class Okienko(QtGui.QMainWindow):
                 stara.zabierz_punkt()
                 self.tryb_przyciskow = None
             else:
-                blad(u"Niedozwolony ruch: %s,%s" % (x, y))
+                self.blad(u"Niedozwolony ruch: %s,%s" % (x, y))
         elif self.tryb_przyciskow == "PRZELEJ":
             if self.gra.wolne_punkty > 0:
                 if nasza:
                     self.gra.dodaj_punkt(x, y)
                 else:
-                    blad(u"Tu nie ma twoich wojsk!")
+                    self.blad(u"Tu nie ma twoich wojsk!")
             else:
-                blad(u"Brak wolnych punktów!")
+                self.blad(u"Brak wolnych punktów!")
             self.tryb_przyciskow = None
         elif self.tryb_przyciskow == "ZABIERZ":
             if nasza:
                 if jednostka.ile_hp > 1:
                     self.gra.zabierz_punkt(x, y)
                 else:
-                    blad(u"Jednostka ma za mało punktów!")
+                    self.blad(u"Jednostka ma za mało punktów!")
             else:
-                blad(u"Tu nie ma twoich wojsk!")
+                self.blad(u"Tu nie ma twoich wojsk!")
             self.tryb_przyciskow = None
         else:
-            blad(u"Nie zaimplementowano.")
-            
-
+            self.blad(u"Nie zaimplementowano.")
     
     def podlacz_sie(self):
         try:
-            Polaczenie.podlacz_sie(self.ui.adresIpEdit.text(), int(self.ui.numerPortuEdit.text()))
+            Polaczenie.podlacz_sie(self.ui.adresIpEdit.text(), 
+                                   int(self.ui.numerPortuEdit.text()))
         except socket.error, e:
-            QtGui.QMessageBox.critical(self, u'Błąd', unicode(e), QtGui.QMessageBox.Ok, QtGui.QMessageBox.Ok)
+            self.blad(unicode(e))
             self.ui.statusbar.showMessage(str(e))
     
     def odswiez_ekran(self):
@@ -165,13 +166,15 @@ class Okienko(QtGui.QMainWindow):
                 self.przyciski[x][y].setText(text)
                 
         if Polaczenie.port_nasluchu:
-            self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % Polaczenie.port_nasluchu)
+            self.statusBar().showMessage(u"Nasłuchuję na porcie %s" % 
+                                         Polaczenie.port_nasluchu)
                 
         if self.gra.polaczenie is not None:
             self.ui.panelGry.setEnabled(not self.gra.gracz.zglosil_ture)
             self.ui.przelejPunktyBtn.setEnabled(self.gra.wolne_punkty > 0)
             self.ui.nrTuryLbl.setText(u"Numer tury: %s" % self.gra.nr_tury)
-            self.ui.pozostaloPunktowLbl.setText(u"Pozostało punktów: %s" % self.gra.wolne_punkty)
+            self.ui.pozostaloPunktowLbl.setText(u"Pozostało punktów: %s" % 
+                                                self.gra.wolne_punkty)
             self.ui.peerList.clear()
             for gniazdo in self.gra.polaczenie.podlaczeni:
                 self.ui.peerList.addItem("(%s) %s:%s" % gniazdo)
